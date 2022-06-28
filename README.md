@@ -78,8 +78,23 @@ variables as shown below.
 
 ```
 $ python ./generate.py
+Summary:
+--------
+
+Output file: hosts.csv
+        Records retrieved from API: 127
+        Rows written to CSV: 127
+
+Output file: containers.csv
+        Records retrieved from API: 405
+        Rows written to CSV: 405
+
+Output file: container_compliance.csv
+        Records retrieved from API: 406
+        Rows written to CSV: 1272
 
 $ ls -1 *csv
+container_compliance.csv
 containers.csv
 hosts.csv
 ```

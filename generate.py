@@ -44,9 +44,7 @@ class CwpApi:
         self.token = r.json()["token"]
 
     def _get_api(self, url, headers, params):
-        r = requests.get(
-            url, headers=headers, params=params, verify=self.verify_tls
-        )
+        r = requests.get(url, headers=headers, params=params, verify=self.verify_tls)
         return r
 
     def get_all(self, api_path, params={}):
@@ -91,6 +89,24 @@ class CwpApi:
         return results
 
 
+def container_compliance_processor(results):
+    header = ["container name", "image", "cluster", "compliance ID", "severity"]
+    rows = []
+
+    for result in results:
+        name = result["info"].get("name")
+        image = result["info"].get("image")
+        cluster = result["info"].get("cluster")
+        issues = result["info"].get("complianceIssues", [])
+
+        for issue in (issues or []):
+            issue_id = issue.get("id")
+            issue_sev = issue.get("severity")
+            rows.append([name, image, cluster, issue_id, issue_sev])
+
+    return header, rows
+
+
 output_map = [
     {
         "filename": "hosts.csv",
@@ -119,18 +135,29 @@ output_map = [
             {"alias": "CSP Account", "path": ["info", "cloudMetadata", "accountID"]},
         ],
     },
+    {
+        "filename": "container_compliance.csv",
+        "endpoint": "containers",
+        "params": {},
+        "processor": container_compliance_processor,
+    },
 ]
 
 if __name__ == "__main__":
     api = CwpApi(CWP_API, CWP_USER, CWP_PASSWORD)
-    for output in output_map:
-        results = api.get_all(output["endpoint"], output["params"])
 
-        with open(output["filename"], "w", newline="") as f:
-            writer = csv.writer(f)
+    print("Summary:\n--------\n")
+
+    for output in output_map:
+        print(f"Output file: {output['filename']}")
+        results = api.get_all(output["endpoint"], output["params"])
+        print(f"\tRecords retrieved from API: {len(results)}")
+        rows = []
+
+        if output.get("processor", None):
+            header, rows = output["processor"](results)
+        else:
             header = [f["alias"] for f in output["fields"]]
-            writer.writerow(header)
-            
             for result in results:
                 row = []
                 for field in output["fields"]:
@@ -141,4 +168,12 @@ if __name__ == "__main__":
                             result,
                         )
                     )
+                rows.append(row)
+
+        with open(output["filename"], "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            for row in rows:
                 writer.writerow(row)
+        print(f"\tRows written to CSV: {len(rows)}\n")
+
